@@ -1,0 +1,4 @@
+files/*
+.idea/*
+deployment-files/*
+.DS_Store
