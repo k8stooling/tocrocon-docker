@@ -44,7 +44,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	//Call Broker with Azure OIDC Information
 	data := BrokerPayload{
-		Sub:    "mysub",
+		Sub:    _identity.UPN + ":" + ClientID,
 		UPN:    _identity.UPN,
 		Groups: _identity.Groups,
 	}
