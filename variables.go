@@ -14,10 +14,9 @@ var scope = "https://graph.microsoft.com/.default offline_access"
 var debugmode = os.Getenv("DEBUGMODE")
 
 type Tokens struct {
-	AccessToken  string   `json:"access_token"`
-	RefreshToken string   `json:"refresh_token"`
-	Expiry       int      `json:"expires_in"`
-	Groups       []string `json:"groups,omitempty"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	Expiry       int    `json:"expires_in"`
 }
 type jwtClaims struct {
 	UPN string `json:"upn"`
