@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -89,79 +88,45 @@ func GetTokens(c AuthorizationConfig) (t Tokens, err error) {
 	return
 }
 
-func GetTokensAndIdentity(c AuthorizationConfig) (t Tokens, identity *IdentityInfo, err error) {
+func getGroupNames(token string) ([]string, error) {
+	url := "https://graph.microsoft.com/v1.0/me/transitiveMemberOf/microsoft.graph.group?$select=id,displayName"
 
-	//First: get tokens
-	t, err = GetTokens(c)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return t, nil, err
+		return nil, err
 	}
 
-	//Then: resolve identity from access token
-	identity, err = ResolveIdentityFromAccessToken(t.AccessToken)
-	if err != nil {
-		return t, nil, errors.Wrap(err, "failed to resolve identity")
-	}
-
-	if debugmode == "true" {
-		fmt.Println("Groups:", identity.Groups)
-		fmt.Println("UPN:", identity.UPN)
-	}
-
-	return t, identity, nil
-}
-
-func callClaimSourceEndpoint(endpoint, accessToken string) ([]string, error) {
-	if debugmode == "true" {
-		fmt.Println("endpoint:", endpoint)
-		fmt.Println("accessToken:", accessToken)
-	}
-
-	reqBody := getMemberObjectsRequest{SecurityEnabledOnly: false}
-	b, err := json.Marshal(reqBody)
-	if debugmode == "true" {
-		fmt.Println("Request-Body:", b)
-	}
-	if err != nil {
-		return nil, errors.Wrap(err, "marshal getMemberObjects request")
-	}
-
-	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(b))
-	if err != nil {
-		return nil, errors.Wrap(err, "build claim_sources request")
-	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
-	if debugmode == "true" {
-		fmt.Println("SendingGroup Objects Request Body:", req.Body)
-		fmt.Println("SendingGroup Objects Request Header:", req.Header)
-	}
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "call claim_sources endpoint")
+		return nil, err
 	}
 	defer resp.Body.Close()
 
+	// Handle non-200 responses
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("graph API error: %s - %s", resp.Status, string(body))
+	}
+
 	body, err := io.ReadAll(resp.Body)
-	if debugmode == "true" {
-		fmt.Println("Claim Request Response Body:", body)
-	}
 	if err != nil {
-		return nil, errors.Wrap(err, "read claim_sources response body")
+		return nil, err
 	}
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, errors.Errorf("claim_sources endpoint returned %d: %s", resp.StatusCode, string(body))
+	var result GraphResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
 	}
 
-	var parsed getMemberObjectsResponse
-	if err := json.Unmarshal(body, &parsed); err != nil {
-		return nil, errors.Wrap(err, "unmarshal claim_sources response")
+	// Extract display names
+	var groupNames []string
+	for _, group := range result.Value {
+		groupNames = append(groupNames, group.DisplayName)
 	}
-	if debugmode == "true" {
-		fmt.Println("Parsed Body response:", parsed.Value)
-	}
-	return parsed.Value, nil
+
+	return groupNames, nil
 }

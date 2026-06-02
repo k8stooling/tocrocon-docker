@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 )
@@ -35,18 +36,35 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		GrantType:   apidata.GrantType,
 	}
 
-	_, _identity, err := GetTokensAndIdentity(requestParams)
+	if debugmode == "true" {
+		fmt.Println("Calling Broker request parameters: ", requestParams)
+	}
+
+	_tokens, err := GetTokens(requestParams)
 	if err != nil {
 		w.Header().Set("Tocrocon-Version", version)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	groupNames, err := getGroupNames(_tokens.AccessToken)
+	fmt.Println("Initiate GRAPH-Call")
+
+	var c jwtClaims
+
+	if err := decodeJWTPayload(_tokens.AccessToken, &c); err != nil {
+		return
+	}
+
+	if debugmode == "true" {
+		fmt.Println("jwtClaims UPN:", c.UPN)
+	}
+
 	//Call Broker with Azure OIDC Information
 	data := BrokerPayload{
-		Sub:    _identity.UPN + ":" + ClientID,
-		UPN:    _identity.UPN,
-		Groups: _identity.Groups,
+		Sub:    c.UPN + ":" + ClientID,
+		UPN:    c.UPN,
+		Groups: groupNames,
 	}
 
 	resp, err := CallBroker(data)
@@ -63,12 +81,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	/*responseData := Tokens{
-		AccessToken:  _token.AccessToken,
-		RefreshToken: _token.RefreshToken,
-		Expiry:       _token.Expiry,
-	}*/
-
 	responseData := Tokens{
 		AccessToken: result.AccessToken,
 		Expiry:      result.Expiry,
@@ -84,5 +96,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Tocrocon-Version", version)
 	w.WriteHeader(http.StatusOK)
-	w.Write(aJson)
+
+	if _, err := w.Write(aJson); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
 }
