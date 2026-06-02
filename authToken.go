@@ -89,9 +89,7 @@ func GetTokens(c AuthorizationConfig) (t Tokens, err error) {
 }
 
 func getGroupNames(token string) ([]string, error) {
-	url := "https://graph.microsoft.com/v1.0/me/transitiveMemberOf/microsoft.graph.group?$select=id,displayName"
-
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", graphURL, nil)
 	if err != nil {
 		return nil, err
 	}

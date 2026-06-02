@@ -82,8 +82,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	responseData := Tokens{
-		AccessToken: result.AccessToken,
-		Expiry:      result.Expiry,
+		AccessToken:  result.AccessToken,
+		RefreshToken: _tokens.RefreshToken,
+		Expiry:       result.Expiry,
 	}
 
 	aJson, err := json.Marshal(responseData)
